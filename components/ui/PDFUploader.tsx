@@ -1,19 +1,30 @@
 import React, { useState, useCallback } from 'react';
 
-// PDF parsing using PDF.js (you'll need to install: npm install pdfjs-dist)
-// For now, using a placeholder that reads file as text - you'll need to implement PDF.js
-const parsePDFContent = async (file: File): Promise<string> => {
-  // This is a placeholder - you'll need to implement PDF.js parsing
-  // For testing, we'll just return a dummy response
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      // This won't actually parse PDF content - just for demo
-      resolve(`PDF file "${file.name}" uploaded successfully. Content would be parsed here.`);
-    };
-    reader.readAsText(file);
+// Pure function to upload and parse PDF via your Next.js API route
+async function parsePDFContent(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+
+  const res = await fetch('/api/parse-pdf', {
+    method: 'POST',
+    body: form,
   });
-};
+
+  if (!res.ok) {
+    // Attempt to parse error message, fallback to generic
+    let errorMsg = 'Server error parsing PDF';
+    try {
+      const json = await res.json();
+      errorMsg = json.error || errorMsg;
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new Error(errorMsg);
+  }
+
+  const { text } = await res.json();
+  return text;
+}
 
 interface PDFUploaderProps {
   onPDFParsed: (text: string) => void;
@@ -25,21 +36,18 @@ export function PDFUploader({ onPDFParsed, onError }: PDFUploaderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
-  const parsePDF = async (file: File): Promise<string> => {
+  // Wrap parsePDFContent to manage loading state
+  const parsePDF = useCallback(async (file: File): Promise<string> => {
+    setIsProcessing(true);
     try {
-      setIsProcessing(true);
-      
-      // Use the placeholder parser for now
-      const extractedText = await parsePDFContent(file);
-      return extractedText;
-      
-    } catch (error) {
-      console.error('PDF parsing error:', error);
-      throw new Error('Failed to parse PDF. Please ensure it\'s a valid PDF file.');
+      return await parsePDFContent(file);
+    } catch (err) {
+      console.error('PDF parsing error:', err);
+      throw err;
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, []);
 
   const handleFile = useCallback(async (file: File) => {
     if (file.type !== 'application/pdf') {
@@ -47,7 +55,7 @@ export function PDFUploader({ onPDFParsed, onError }: PDFUploaderProps) {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+    if (file.size > 10 * 1024 * 1024) {
       onError('File size must be less than 10MB.');
       return;
     }
@@ -55,23 +63,24 @@ export function PDFUploader({ onPDFParsed, onError }: PDFUploaderProps) {
     try {
       setUploadedFileName(file.name);
       const extractedText = await parsePDF(file);
-      
+
       if (extractedText.length < 10) {
         onError('Could not extract text from PDF. The file might be image-based or corrupted.');
+        setUploadedFileName(null);
         return;
       }
-      
+
       onPDFParsed(extractedText);
-    } catch (error) {
-      onError(error instanceof Error ? error.message : 'Failed to process PDF');
+    } catch (err: any) {
+      onError(err.message || 'Failed to process PDF');
       setUploadedFileName(null);
     }
-  }, [onPDFParsed, onError]);
+  }, [onPDFParsed, onError, parsePDF]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFile(files[0]);
@@ -121,7 +130,7 @@ export function PDFUploader({ onPDFParsed, onError }: PDFUploaderProps) {
           className="hidden"
           disabled={isProcessing}
         />
-        
+
         <div className="text-center">
           {isProcessing ? (
             <div className="flex flex-col items-center">
@@ -154,9 +163,7 @@ export function PDFUploader({ onPDFParsed, onError }: PDFUploaderProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <p className="text-gray-800 dark:text-gray-200 font-medium">Upload PDF Document</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Drag and drop or click to browse (Max 10MB)
-              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Drag and drop or click to browse (Max 10MB)</p>
             </div>
           )}
         </div>
