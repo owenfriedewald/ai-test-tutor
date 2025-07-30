@@ -1,20 +1,19 @@
 # AI Test Tutor
 
 This is a project intended to create efficient study tools for college students using OpenAI's API, and in the future crowd sourced data pertaining to specific courses and content.
-Bulit with Next.js, Tailwind, OpenAI API, Auth0, TBD...
+Bulit with Next.js, Tailwind, OpenAI API, and PDF parsing. Development was halted after the announcement of ChatGPT's "Study Mode".
 
 ## Key Features
 - Custom AI prompts through metadata upload
-- PDF Upload documents to generate AI tutoring help
+- PDF Parsing of documents for course metadata
 - Clean, crisp, modern UI design
-- Dark mode (toggle in works)
 - Follow-up buttons and additional content generation
+- Dynamic, beautiful flashcards
 
-## In progress
+## Future Planned Features Included
 - Auth and account profile setup with more sophisticated rate limiting
-- Data collection for mass database
-- More complex AI-driven assistance (flashcards, interactive quizzes, games, etc.)
-- Working dark mode toggle
+- Mass database with plans to integrate social networking (ratemyprofessor esque)
+- More complex AI-driven assistance (interactive quizzes, games, etc.)
 
 ## License
 MIT

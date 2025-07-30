@@ -7,6 +7,10 @@ import { TextArea } from "../components/ui/TextArea";
 import { Button } from "../components/ui/Button";
 import { PDFUploader } from "../components/ui/PDFUploader";
 import { useDarkMode } from "../hooks/useDarkMode";
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+
 
 console.log({ PageLayout, Header, Card, TextArea, Button, useDarkMode });
 
@@ -348,7 +352,7 @@ export default function Home() {
 
               <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-lg min-h-[520px] max-h-[650px] overflow-y-auto">
                 <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200 leading-relaxed">
-                  <ReactMarkdown>{response}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{response}</ReactMarkdown>
                 </div>
               </div>
 
@@ -364,7 +368,7 @@ export default function Home() {
                   </div>
                   <div className="bg-purple-50/70 dark:bg-purple-900/20 backdrop-blur-sm rounded-2xl border border-purple-200/50 dark:border-purple-700/50 p-6 shadow-lg">
                     <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200 leading-relaxed">
-                      <ReactMarkdown>{followUpResponse}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{followUpResponse}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
@@ -410,7 +414,7 @@ export default function Home() {
           <div className="text-center">
             <div className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-2">Question</div>
             <div className="text-lg text-gray-800 dark:text-gray-200 font-medium">
-              <ReactMarkdown>{flashcards[currentCardIndex]?.question}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{flashcards[currentCardIndex]?.question}</ReactMarkdown>
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">Click to reveal answer</div>
           </div>
@@ -429,7 +433,7 @@ export default function Home() {
           <div className="text-center">
             <div className="text-sm text-green-600 dark:text-green-400 font-medium mb-2">Answer</div>
             <div className="text-lg text-gray-800 dark:text-gray-200 font-medium">
-              <ReactMarkdown>{flashcards[currentCardIndex]?.answer}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{flashcards[currentCardIndex]?.answer}</ReactMarkdown>
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">Click to see question</div>
           </div>
