@@ -3,19 +3,21 @@ import ReactMarkdown from "react-markdown";
 import { PageLayout } from "../components/layout";
 import { Header } from "../components/sections/Header";
 import { Card } from "../components/ui/Card";
-import { InputField } from "../components/ui/InputField";
 import { TextArea } from "../components/ui/TextArea";
 import { Button } from "../components/ui/Button";
 import { PDFUploader } from "../components/ui/PDFUploader";
 import { useDarkMode } from "../hooks/useDarkMode";
 
-console.log({ PageLayout, Header, Card, InputField, TextArea, Button, useDarkMode });
+console.log({ PageLayout, Header, Card, TextArea, Button, useDarkMode });
+
+interface InferredMetadata {
+  course?: string;
+  professor?: string;
+  school?: string;
+  semester?: string;
+}
 
 export default function Home() {
-  const [college, setCollege] = useState("");
-  const [professor, setProfessor] = useState("");
-  const [course, setCourse] = useState("");
-  const [semester, setSemester] = useState("");
   const [content, setContent] = useState("");
   const [response, setResponse] = useState("");
   const [followUpResponse, setFollowUpResponse] = useState("");
@@ -25,6 +27,12 @@ export default function Home() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [pdfError, setPdfError] = useState("");
   const [activeTab, setActiveTab] = useState<'paste' | 'upload'>('upload');
+  
+  // Metadata inference states
+  const [showMetadataPopup, setShowMetadataPopup] = useState(false);
+  const [inferredMetadata, setInferredMetadata] = useState<InferredMetadata>({});
+  const [editableMetadata, setEditableMetadata] = useState<InferredMetadata>({});
+  const [metadataLoading, setMetadataLoading] = useState(false);
 
   const { darkMode, toggleDarkMode } = useDarkMode();
 
@@ -42,8 +50,38 @@ export default function Home() {
     setPdfError("");
   };
 
+  const inferMetadata = async (contentPreview: string) => {
+    try {
+      setMetadataLoading(true);
+      const res = await fetch("/api/infer-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          content: contentPreview.substring(0, 1000) 
+        }),
+      });
+      const data = await res.json();
+      return data.metadata;
+    } catch (error) {
+      console.error("Error inferring metadata:", error);
+      return {};
+    } finally {
+      setMetadataLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Step 1: Infer metadata from first 1000 characters
+    const metadata = await inferMetadata(content);
+    setInferredMetadata(metadata);
+    setEditableMetadata({ ...metadata });
+    setShowMetadataPopup(true);
+  };
+
+  const handleMetadataConfirm = async () => {
+    setShowMetadataPopup(false);
     setLoading(true);
     setResponse("");
     setFollowUpResponse("");
@@ -51,10 +89,17 @@ export default function Home() {
     setIsTransitioning(true);
     
     try {
+      // Step 2: Generate study help with full content + confirmed metadata
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ college, professor, course, semester, content }),
+        body: JSON.stringify({ 
+          college: editableMetadata.school || "",
+          professor: editableMetadata.professor || "",
+          course: editableMetadata.course || "",
+          semester: editableMetadata.semester || "",
+          content 
+        }),
       });
       const data = await res.json();
       
@@ -89,7 +134,10 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          college, professor, course, semester,
+          college: editableMetadata.school || "",
+          professor: editableMetadata.professor || "",
+          course: editableMetadata.course || "",
+          semester: editableMetadata.semester || "",
           content: prompts[followUpType as keyof typeof prompts],
           maxTokens: 250
         }),
@@ -115,33 +163,6 @@ export default function Home() {
         <div className={`transition-all duration-500 ${response || isTransitioning ? 'opacity-0 max-h-0 overflow-hidden' : 'opacity-100 max-h-full'}`}>
           <div className="p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  placeholder="🏫 College or University"
-                  value={college}
-                  onChange={(e) => setCollege(e.target.value)}
-                  maxLength={100}
-                />
-                <InputField
-                  placeholder="👨‍🏫 Professor Name"
-                  value={professor}
-                  onChange={(e) => setProfessor(e.target.value)}
-                  maxLength={100}
-                />
-                <InputField
-                  placeholder="📚 Course Name"
-                  value={course}
-                  onChange={(e) => setCourse(e.target.value)}
-                  maxLength={100}
-                />
-                <InputField
-                  placeholder="📅 Semester (e.g., Fall 2024)"
-                  value={semester}
-                  onChange={(e) => setSemester(e.target.value)}
-                  maxLength={100}
-                />
-              </div>
-
               <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                 <button
                   type="button"
@@ -196,7 +217,7 @@ export default function Home() {
                       placeholder="📄 Paste your syllabus, practice exam, study guide, or course details here..."
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      maxLength={12000}
+                      maxLength={10000}
                     />
                     {content && (
                       <div className="flex justify-end">
@@ -215,12 +236,12 @@ export default function Home() {
 
               <Button 
                 type="submit" 
-                loading={loading} 
+                loading={metadataLoading} 
                 className="w-full"
                 disabled={!content.trim()}
               >
-                {loading ? (
-                  "Generating Your Study Plan..."
+                {metadataLoading ? (
+                  "Analyzing document..."
                 ) : (
                   <>
                     <svg className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +259,7 @@ export default function Home() {
           <Card className="mt-6 flex justify-center items-center min-h-[300px]">
             <div className="text-center">
               <div className="animate-spin h-8 w-8 mx-auto mb-4 border-4 border-blue-500 border-t-transparent rounded-full" />
-              <p className="text-gray-600 dark:text-gray-400">Analyzing your content and generating your plan...</p>
+              <p className="text-gray-600 dark:text-gray-400">Generating your personalized study plan...</p>
             </div>
           </Card>
         )}
@@ -319,6 +340,97 @@ export default function Home() {
           </Card>
         )}
       </Card>
+
+      {/* Metadata Confirmation Popup */}
+      {showMetadataPopup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Document Information Found</h3>
+              </div>
+              
+              <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
+                We found this information from your document. Please review and edit if needed:
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Course
+                  </label>
+                  <input
+                    type="text"
+                    value={editableMetadata.course || ""}
+                    onChange={(e) => setEditableMetadata({...editableMetadata, course: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., CS 1050"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Professor
+                  </label>
+                  <input
+                    type="text"
+                    value={editableMetadata.professor || ""}
+                    onChange={(e) => setEditableMetadata({...editableMetadata, professor: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Dr. Smith"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    School
+                  </label>
+                  <input
+                    type="text"
+                    value={editableMetadata.school || ""}
+                    onChange={(e) => setEditableMetadata({...editableMetadata, school: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., University of Missouri"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Semester
+                  </label>
+                  <input
+                    type="text"
+                    value={editableMetadata.semester || ""}
+                    onChange={(e) => setEditableMetadata({...editableMetadata, semester: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Fall 2024"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <Button
+                  onClick={() => setShowMetadataPopup(false)}
+                  className="flex-1 bg-gray-500 hover:bg-gray-600"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleMetadataConfirm}
+                  className="flex-1"
+                >
+                  Generate Study Help
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="text-center mt-8">
         <p className="text-gray-500 dark:text-gray-400 text-sm">
