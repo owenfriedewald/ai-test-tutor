@@ -33,6 +33,12 @@ export default function Home() {
   const [inferredMetadata, setInferredMetadata] = useState<InferredMetadata>({});
   const [editableMetadata, setEditableMetadata] = useState<InferredMetadata>({});
   const [metadataLoading, setMetadataLoading] = useState(false);
+  
+  // Flashcard states
+  const [flashcards, setFlashcards] = useState<Array<{question: string, answer: string}>>([]);
+  const [showFlashcards, setShowFlashcards] = useState(false);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
 
   const { darkMode, toggleDarkMode } = useDarkMode();
 
@@ -122,28 +128,47 @@ export default function Home() {
     setFollowUpLoading(true);
     setShowFollowUp(false);
     setFollowUpResponse("");
+    setShowFlashcards(false);
     
     try {
-      const prompts = {
-        "Practice Questions": "Given the previous message you sent, generate practice questions for the user in under 250 tokens",
-        "Explain key formulas": "Given the previous message you sent, explain key formulas for the user in under 250 tokens",
-        "Placeholder": "Given the previous message you sent, provide additional study tips for the user in under 250 tokens"
-      };
-      
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          college: editableMetadata.school || "",
-          professor: editableMetadata.professor || "",
-          course: editableMetadata.course || "",
-          semester: editableMetadata.semester || "",
-          content: prompts[followUpType as keyof typeof prompts],
-          maxTokens: 250
-        }),
-      });
-      const data = await res.json();
-      setFollowUpResponse(data.result);
+      if (followUpType === "Flashcards") {
+        const res = await fetch("/api/generate-flashcards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            college: editableMetadata.school || "",
+            professor: editableMetadata.professor || "",
+            course: editableMetadata.course || "",
+            semester: editableMetadata.semester || "",
+            content: content
+          }),
+        });
+        const data = await res.json();
+        setFlashcards(data.flashcards || []);
+        setShowFlashcards(true);
+        setCurrentCardIndex(0);
+        setIsFlipped(false);
+      } else {
+        const prompts = {
+          "Practice Questions": "Given the previous message you sent, generate practice questions for the user in under 250 tokens",
+          "Explain key formulas": "Given the previous message you sent, explain key formulas for the user in under 250 tokens"
+        };
+        
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            college: editableMetadata.school || "",
+            professor: editableMetadata.professor || "",
+            course: editableMetadata.course || "",
+            semester: editableMetadata.semester || "",
+            content: prompts[followUpType as keyof typeof prompts],
+            maxTokens: 250
+          }),
+        });
+        const data = await res.json();
+        setFollowUpResponse(data.result);
+      }
     } catch (error) {
       console.error("Error generating follow-up:", error);
       setFollowUpResponse("Sorry, there was an error generating the follow-up response.");
@@ -152,8 +177,42 @@ export default function Home() {
     }
   };
 
+  const nextCard = () => {
+    if (currentCardIndex < flashcards.length - 1) {
+      setCurrentCardIndex(currentCardIndex + 1);
+      setIsFlipped(false);
+    }
+  };
+
+  const prevCard = () => {
+    if (currentCardIndex > 0) {
+      setCurrentCardIndex(currentCardIndex - 1);
+      setIsFlipped(false);
+    }
+  };
+
+  const flipCard = () => {
+    setIsFlipped(!isFlipped);
+  };
+
   return (
-    <PageLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode}>
+    <>
+      <style jsx>{`
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+        .transform-style-preserve-3d {
+          transform-style: preserve-3d;
+        }
+        .backface-hidden {
+          backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+          transform: rotateY(180deg);
+        }
+      `}</style>
+      
+      <PageLayout darkMode={darkMode} onToggleDarkMode={toggleDarkMode}>
       <Header 
         title="AI Test Tutor"
         subtitle="Transform your study materials into personalized tutoring sessions. Upload your syllabus, practice tests, or study guides and get tailored help."
@@ -274,6 +333,7 @@ export default function Home() {
                     setResponse("");
                     setFollowUpResponse("");
                     setShowFollowUp(false);
+                    setShowFlashcards(false);
                     setIsTransitioning(false);
                   }}
                   className="px-4 py-2 bg-gray-500/20 hover:bg-gray-500/30 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-200 text-sm"
@@ -306,6 +366,98 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Flashcards Display */}
+              {showFlashcards && flashcards.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center mr-3">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Flashcards</h3>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {currentCardIndex + 1} of {flashcards.length}
+                    </div>
+                  </div>
+                  
+                  <div className="perspective-1000 h-64 mb-6">
+                    <div 
+                      className={`relative w-full h-full cursor-pointer transition-transform duration-700 transform-style-preserve-3d ${
+                        isFlipped ? 'rotate-y-180' : ''
+                      }`}
+                      onClick={flipCard}
+                    >
+                      {/* Front of card (Question) */}
+                      <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30 rounded-2xl border border-blue-200/50 dark:border-blue-700/50 p-6 flex items-center justify-center shadow-lg">
+                        <div className="text-center">
+                          <div className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-2">Question</div>
+                          <div className="text-lg text-gray-800 dark:text-gray-200 font-medium">
+                            <ReactMarkdown>{flashcards[currentCardIndex]?.question}</ReactMarkdown>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">Click to reveal answer</div>
+                        </div>
+                      </div>
+                      
+                      {/* Back of card (Answer) */}
+                      <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/30 rounded-2xl border border-green-200/50 dark:border-green-700/50 p-6 flex items-center justify-center shadow-lg">
+                        <div className="text-center">
+                          <div className="text-sm text-green-600 dark:text-green-400 font-medium mb-2">Answer</div>
+                          <div className="text-lg text-gray-800 dark:text-gray-200 font-medium">
+                            <ReactMarkdown>{flashcards[currentCardIndex]?.answer}</ReactMarkdown>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">Click to see question</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Navigation controls */}
+                  <div className="flex items-center justify-between">
+                    <Button
+                      onClick={prevCard}
+                      disabled={currentCardIndex === 0}
+                      className="flex items-center space-x-2 px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      <span>Previous</span>
+                    </Button>
+                    
+                    <div className="flex space-x-2">
+                      {flashcards.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setCurrentCardIndex(index);
+                            setIsFlipped(false);
+                          }}
+                          className={`w-3 h-3 rounded-full transition-colors ${
+                            index === currentCardIndex
+                              ? 'bg-blue-500'
+                              : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    
+                    <Button
+                      onClick={nextCard}
+                      disabled={currentCardIndex === flashcards.length - 1}
+                      className="flex items-center space-x-2 px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span>Next</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {(showFollowUp || followUpLoading) && (
                 <div className="mt-6">
                   {followUpLoading ? (
@@ -322,7 +474,7 @@ export default function Home() {
                     <>
                       <p className="text-gray-700 dark:text-gray-300 mb-4 font-medium">What do you want specifically?</p>
                       <div className="flex flex-wrap gap-3">
-                        {["Practice Questions", "Explain key formulas", "Placeholder"].map((option) => (
+                        {["Practice Questions", "Explain key formulas", "Flashcards"].map((option) => (
                           <Button
                             key={option}
                             onClick={() => handleFollowUp(option)}
@@ -407,7 +559,7 @@ export default function Home() {
                     type="text"
                     value={editableMetadata.semester || ""}
                     onChange={(e) => setEditableMetadata({...editableMetadata, semester: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-5ize00 focus:border-transparent"
                     placeholder="e.g., Fall 2024"
                   />
                 </div>
@@ -438,5 +590,6 @@ export default function Home() {
         </p>
       </div>
     </PageLayout>
+    </>
   );
 }
