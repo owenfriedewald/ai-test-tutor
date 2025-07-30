@@ -16,12 +16,12 @@ export function useDarkMode() {
     const root = document.documentElement;
     if (darkMode) {
       root.classList.add("dark");
-      root.style.colorScheme = "dark";
       localStorage.setItem("theme", "dark");
+      document.documentElement.setAttribute('data-mode', 'dark');
     } else {
       root.classList.remove("dark");
-      root.style.colorScheme = "light";
       localStorage.setItem("theme", "light");
+      document.documentElement.setAttribute('data-mode', 'light');
     }
   }, [darkMode]);
 
@@ -29,4 +29,3 @@ export function useDarkMode() {
 
   return { darkMode, toggleDarkMode };
 }
-

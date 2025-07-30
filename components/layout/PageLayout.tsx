@@ -13,7 +13,7 @@ export function PageLayout({ children, darkMode, onToggleDarkMode }: PageLayoutP
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 
         dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 relative overflow-hidden transition-colors duration-300">
         
-        <DarkModeToggle darkMode={darkMode} onToggle={onToggleDarkMode} />
+        {false && (<DarkModeToggle darkMode={darkMode} onToggle={onToggleDarkMode} />)}
 
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
